@@ -1,0 +1,33 @@
+GET http://localhost:3000/users
+
+###
+
+GET http://localhost:3000/users/1d5s1a3fd5-d1a5d1f
+
+###
+
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+    "email": "kimdaily@navver.com",
+    "firstName": "daily",
+    "lastName": "kim",
+    "address": "seoul in korea"
+}
+
+
+###
+
+PATCH http://localhost:3000/users/1d5s1a3fd5-d1a5d1f
+Content-Type: application/json
+
+{
+    "email": "kimday@goooooooogle.com",
+    "address": "yonginsi in korea!"
+}
+
+
+###
+
+DELETE http://localhost:3000/users/1d5s1a3fd5-d1a5d1f

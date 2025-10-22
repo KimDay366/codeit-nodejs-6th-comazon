@@ -1,0 +1,39 @@
+
+GET http://localhost:3000/products
+
+###
+
+GET http://localhost:3000/products?count=2
+
+###
+
+GET http://localhost:3000/products/b8de7c4b-4ac4-46a1-a25c-31d889db152a
+
+
+###
+
+POST http://localhost:3000/products
+Content-Type: application/json
+
+{
+    "name" : "선풍기",
+  "description" : "아이더워..",
+  "category" : "HOME_INTERIOR",
+  "price" : 30000,
+  "stock" : 50
+}
+
+###
+
+PATCH http://localhost:3000/products/b8de7c4b-4ac4-46a1-a25c-31d889db152a
+Content-Type: application/json
+
+{
+    "name" : "다리온풍기",
+  "description" : "무릎이 시려"
+}
+
+###
+
+DELETE http://localhost:3000/products/b8de7c4b-4ac4-46a1-a25c-31d889db152a
+

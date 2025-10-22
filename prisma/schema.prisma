@@ -42,3 +42,6 @@ enum Category {
   ELECTRONICS
   HOME_INTERIOR
 }
+
+
+
