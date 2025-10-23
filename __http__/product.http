@@ -3,7 +3,16 @@ GET http://localhost:3000/products
 
 ###
 
-GET http://localhost:3000/products?count=2
+GET http://localhost:3000/products?limit=2
+
+
+###
+
+GET http://localhost:3000/products?category=ELECTRONICS
+
+
+###
+GET http://localhost:3000/products?order=priceLowest&category=ELECTRONICS&limit=2
 
 
 ###

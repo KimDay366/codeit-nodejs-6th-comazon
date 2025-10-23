@@ -2,7 +2,11 @@ GET http://localhost:3000/users
 
 ###
 
-GET http://localhost:3000/users/1d5s1a3fd5-d1a5d1f
+GET http://localhost:3000/users?order=oldest&offset=2&limit=1
+
+###
+
+GET http://localhost:3000/users/3651f3f4-1c0d-4067-83ba-e86de2143024
 
 ###
 
@@ -10,7 +14,7 @@ POST http://localhost:3000/users
 Content-Type: application/json
 
 {
-    "email": "kimdaily@navver.com",
+    "email": "kimdaily15@naver.com",
     "firstName": "daily",
     "lastName": "kim",
     "address": "seoul in korea"
@@ -19,12 +23,11 @@ Content-Type: application/json
 
 ###
 
-PATCH http://localhost:3000/users/1d5s1a3fd5-d1a5d1f
+PATCH http://localhost:3000/users/3651f3f4-1c0d-4067-83ba-e86de2143024
 Content-Type: application/json
 
 {
-    "email": "kimday@goooooooogle.com",
-    "address": "yonginsi in korea!"
+    "firstName": "daily"
 }
 
 
