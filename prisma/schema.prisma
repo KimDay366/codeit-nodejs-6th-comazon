@@ -38,10 +38,9 @@ model Product {
 enum Category {
   FASHION
   BEAUTY
-  SPORT
+  SPORTS
   ELECTRONICS
   HOME_INTERIOR
+  HOUSEHOLD_SUPPLIES
+  KITCHENWARE
 }
-
-
-
