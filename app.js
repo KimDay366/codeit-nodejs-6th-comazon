@@ -91,18 +91,33 @@ app.post('/users', async (req, res) => {
   assert(req.body, CreateUser); //전달받은 데이터 검증을 진행
   const { userPreference, ...userFields } = req.body;
 
+  // console.log(userPreference);
+  // userPreference model 에 사용할 정보
+  //{"receiveEmail" : true} 출력
+
+  // console.log(userFields);
+  // User model 에 사용할 정보
+  // {
+  //   email: 'kimdaily11265@naver.com',
+  //   firstName: 'daily',
+  //   lastName: 'kim',
+  //   address: 'seoul in korea'
+  // }
+
   const user = await prisma.user.create({
     data: {
+      // email. firstName, lastName.. 기존 값
       ...userFields,
+      // 동시에 userPreference라는 데이터까지 함께 만듦
+      // 왜냐면 두 개의 모델이 서로 "관계"에 있기 때문에
       userPreference: {
         create: userPreference,
-      },
+      }, // 별도의 model로 되어있는 userPreference는  [create : userPreference => {"receiveEmail" : true} ] 로 값을 만들어서 사용
     },
     include: {
       userPreference: true,
-    },
+    }, // 최종 return 결과를 볼 때 User만 표기하는데, 함꼐 만들어진 userPreference 까지 함께 보여달라고 하는 확인용 메세지
   });
-  // 별도의 model로 되어있기 때문에 create : userPreference로 값을 만들어서 사용
 
   res.status(201).send(user);
 });

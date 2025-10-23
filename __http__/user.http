@@ -29,7 +29,7 @@ POST http://localhost:3000/users
 Content-Type: application/json
 
 {
-    "email": "kimdaily11265@naver.com",
+    "email": "kimda123ily11265@naver.com",
     "firstName": "daily",
     "lastName": "kim",
     "address": "seoul in korea",

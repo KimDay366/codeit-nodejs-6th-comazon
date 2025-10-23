@@ -22,7 +22,16 @@ model User {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   userPreference UserPreference?
+  orders         Order[]
 }
+
+// UserPreference? - 단일값, 1 : 1 로 매칭 될 떄 
+// Order[] - 배열, User 입장에서 보면 1:N 매칭이 되므로, order가 여러개 생겨서 배열로 값을 선언함
+
+// UserPreference => userPreference
+// 마이크레이션을 진행하면 현재 파일을 기준으로 클라이언트가 사용할 DB를 다시 만들어 주는데 
+// userPreference 는 DB테이블에서 사용되는 값이 아니라 
+// prisma UI에서만 사용되는 값이기 때문에 prisma에서만 업데이트 하면 되는 값이었던것!
 
 model UserPreference {
   id           String   @id @default(uuid())
@@ -41,14 +50,15 @@ model UserPreference {
 // 만약에 다른 경우로 쓴다면 @unique를 쓰면 안됨!
 
 model Product {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   name        String
   description String?
   category    Category
   price       Float
   stock       Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
 }
 
 // enum : 쇼핑몰처럼 제품 분류시 사용하는 카테고리 등록할 떄 쓰는 명령어
@@ -60,4 +70,36 @@ enum Category {
   HOME_INTERIOR
   HOUSEHOLD_SUPPLIES
   KITCHENWARE
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  status     OrderStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId     String?
+  orderItems OrderItem[]
+}
+
+// user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+// userId     String?
+// @relation 에서 onDelete : SetNull -> 유저가 삭제되면 Null 넣는것이므로 
+// null = 빈값 = userID가 String 규칙이 안맞기 때문에 둘 다 속성에 ?를 넣어서 옵셔널 하게 바꿔줌
+
+enum OrderStatus {
+  PENDING
+  COMPLETE
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  unitPrice Float
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId String?
 }
