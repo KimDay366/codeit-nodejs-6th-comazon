@@ -14,14 +14,31 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  firstName String
-  lastName  String
-  address   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(uuid())
+  email          String          @unique
+  firstName      String
+  lastName       String
+  address        String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  userPreference UserPreference?
 }
+
+model UserPreference {
+  id           String   @id @default(uuid())
+  receiveEmail Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+}
+
+// @relation 하기 
+//user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+//사용 할 값 이름  |  참조 할 model이름  |  @relation(fields: [ 정의하고 있는 모델 = 현재 모델, UserPreference ] 안에서 사용할 필드 이름, references: 참조 할  필드 이름, onDelete: 참조 데이터가 삭제될 떄 설정)
+// userId  String  @unique
+// 참조하여 가지고 온 데이터의 경우 1 : 1 관계로 참조 할 경우, @unique를 써야 함
+// 만약에 다른 경우로 쓴다면 @unique를 쓰면 안됨!
 
 model Product {
   id          String   @id @default(uuid())

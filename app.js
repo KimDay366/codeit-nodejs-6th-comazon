@@ -65,7 +65,7 @@ app.get('/users/:id', async (req, res) => {
   }
 });
 
-// users POST
+// users POST 기존
 // app.post('/users', async (req, res) => {
 //   const data = req.body;
 //   const user = await prisma.user.create({
@@ -75,12 +75,34 @@ app.get('/users/:id', async (req, res) => {
 //   res.status(201).send(user);
 // });
 
+// users POST 유효성 검사
+// app.post('/users', async (req, res) => {
+//   const data = req.body;
+//   assert(data, CreateUser); //전달받은 데이터 검증을 진행
+//   const user = await prisma.user.create({
+//     data,
+//   });
+
+//   res.status(201).send(user);
+// });
+
+// users POST UserPreference 필드 추가
 app.post('/users', async (req, res) => {
-  const data = req.body;
-  assert(data, CreateUser); //전달받은 데이터 검증을 진행
+  assert(req.body, CreateUser); //전달받은 데이터 검증을 진행
+  const { userPreference, ...userFields } = req.body;
+
   const user = await prisma.user.create({
-    data,
+    data: {
+      ...userFields,
+      userPreference: {
+        create: userPreference,
+      },
+    },
+    include: {
+      userPreference: true,
+    },
   });
+  // 별도의 model로 되어있기 때문에 create : userPreference로 값을 만들어서 사용
 
   res.status(201).send(user);
 });

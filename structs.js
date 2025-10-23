@@ -9,6 +9,9 @@ export const CreateUser = s.object({
   // s.size() : 문자,숫자 등의 데이터가 사용자가 정한 숫자 내의 길의를 가지고 있는지 확인
   lastName: s.size(s.string(), 1, 30),
   address: s.string(),
+  userPreference: s.object({
+    receiveEmail: s.boolean(),
+  }),
 });
 
 // UpdateUser : 데이터 수정 = 옵셔널 하게 검사 할 수 있도록 셋팅
