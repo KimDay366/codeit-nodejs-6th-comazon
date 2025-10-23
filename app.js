@@ -77,12 +77,13 @@ app.delete('/users/:id', async (req, res) => {
 
 // product GET all
 app.get('/products', async (req, res) => {
+  // 가져오는 갯수 설정이 있는 경우
   const count = Number(req.query.count) || 10;
-  console.log(count);
   const product = await prisma.product.findMany({
     take: count,
   });
 
+  // 가져오는 갯수 설정이 없는 경우
   //   const product = await prisma.product.findMany();
 
   res.send(product);
