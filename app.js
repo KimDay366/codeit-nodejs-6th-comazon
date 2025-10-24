@@ -10,6 +10,37 @@ const prisma = new PrismaClient();
 // postgres에 저장되어 있는 데이터 = 우리가 쓸 수 없음
 // prisma client가 Progres 에서 가져 온 데이터를 우리가 사용 할 수 있게 변환 해 줌 = ORM 과정
 
+// 유저가 없을때 처리 하는 내용 => 고차함수 asyncHandler()를 만들고 Get-id 함수마다 사용
+// try {
+//   const user = await prisma.user.findUniqueOrThrow({
+//     where: { id },
+//     include: {
+//       userPreference: true,
+//     },
+//   });
+// } catch (e) {
+//   console.error(e);
+//   if (e.code === 'P2025') {
+//     // 존재하는 user가 없음
+//     return res.status(404).send({ messege: 'Cannot find user' });
+//   }
+// }
+
+function asyncHandler(handler) {
+  return async function (req, res) {
+    try {
+      await handler(req, res);
+    } catch (e) {
+      // if 구문으로 에러 값을 적어서 여러 에러를 처리 가능!
+      if (e.code === 'P2025') {
+        res.sendStatus(404);
+      } else {
+        res.status(500).send({ message: e.mossage });
+      }
+    }
+  };
+}
+
 // users GET all
 // app.get('/users', async (req, res) => {
 //   const users = await prisma.user.findMany();
@@ -20,7 +51,7 @@ const prisma = new PrismaClient();
 
 // user GET Filter
 app.get('/users', async (req, res) => {
-  const { offset = 0, limit = 0, order = 'newest' } = req.query;
+  const { offset = 0, limit = 5, order = 'newest' } = req.query;
 
   let orderBy;
   // findMany 프로퍼티 명과 동일하게 변수 명을 사용함
@@ -54,26 +85,43 @@ app.get('/users', async (req, res) => {
 });
 
 // users GET ID
-app.get('/users/:id', async (req, res) => {
-  // 다이나믹 URL = :id
-  // 고정되지 않은 id같은 값을 URL로 써야 할 경우 쓰는 방식
-  const id = req.params.id;
-  const user = await prisma.user.findUnique({
-    include: {
-      userPreference: true,
-      // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
-      // 따라서 include 해서 해당 정보를 가져옴
-    },
-    where: { id },
-    // shortEnd 문법 -> id:id = id 만 써도 됨
-  });
+// app.get('/users/:id', async (req, res) => {
+//   // 다이나믹 URL = :id
+//   // 고정되지 않은 id같은 값을 URL로 써야 할 경우 쓰는 방식
+//   const id = req.params.id;
+//   const user = await prisma.user.findUnique({
+//     where: { id },
+//     // shortEnd 문법 -> id:id = id 만 써도 됨
+//     include: {
+//       userPreference: true,
+//       // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
+//       // 따라서 include 해서 해당 정보를 가져옴
+//     },
+//   });
 
-  if (user) {
+//   if (user) {
+//     res.send(user);
+//   } else {
+//     res.status(404).send({ message: 'Cannot find given id' });
+//   }
+// });
+
+// 유저가 없는 경우에 대한 내용까지 처리
+app.get(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    // findUniqueOrThrow : id로 값을 찾고, 만약 없으면 에러 코드를 내보냄
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: {
+        userPreference: true,
+      },
+    });
+
     res.send(user);
-  } else {
-    res.status(404).send({ message: 'Cannot find given id' });
-  }
-});
+  }),
+);
 
 // users POST 기존
 // app.post('/users', async (req, res) => {
@@ -318,17 +366,88 @@ app.get('/orders', async (req, res) => {
 app.post('/orders', async (req, res) => {
   assert(req.body, CreatOrder);
   const { orderItems, ...orderProperties } = req.body;
-  const order = await prisma.order.create({
-    data: {
-      ...orderProperties,
-      orderItems: {
-        create: orderItems,
-      },
-    },
-    include: {
-      orderItems: true,
-    },
+
+  // === 재고가 충분한가? stock(재고)와 quentity(주문물량) 비교 ===
+
+  // 1. order body에서 받아온 product Id들을 찾기
+  const productIds = orderItems.map((orderItem) => orderItem.productId);
+
+  // 2. orderItem 안에서 productId에 맞는 quentity(주문물량)를 내보냄
+  function getQuantity(productId) {
+    const orderItem = orderItems.find((orderItem) => orderItem.productId === productId);
+    return orderItem.quantity;
+  }
+
+  // 3. Prisma 데이터에서 stock을 가져오기 위한 작업
+  const products = await prisma.product.findMany({
+    // 서버에서 where로 특정 아이디를 찾은 뒤, 그 아이디 안에서 productIds를 찾아옴
+    where: { id: { in: productIds } },
   });
+
+  // 4. stock(재고)이 quentity(주문물량)를 넘지 않는지 비교
+  const isSufficientStock = products.every((product) => {
+    const { id, stock } = product;
+    return stock >= getQuantity(id);
+  });
+
+  // 5-1. 재고가 부족 한 경우, 조기종료
+  if (!isSufficientStock) {
+    return res.send(500).send({ message: 'Insufficient Stock' });
+  }
+
+  // 5-2. 재고가 있는 경우 해당 아이템을 찾아서, 데이터베이스에 있는 재고를 수정함
+  // Promise.all을 사용해서, 각 Product가 여러개 일때 순차적 실행이 아니라 한번에 병렬로 실행되게 선언
+  // await Promise.all(
+  //   productIds.map((id) => {
+  //     prisma.product.update({
+  //       where: { id },
+  //       data: { stock: { decrement: getQuantity(id) } },
+  //       // stock: { decrement: getQuantity(id) }
+  //       // stock = stock - getQuantity(id)
+  //       // 즉, 기존 재고에서 주문 물량을 빼버림
+  //     });
+  //   }),
+  // );
+
+  // const order = await prisma.order.create({
+  //   data: {
+  //     ...orderProperties,
+  //     orderItems: {
+  //       create: orderItems,
+  //     },
+  //   },
+  //   include: {
+  //     orderItems: true,
+  //   },
+  // });
+
+  // 위와 같이 요청 작업을 개별로 하면 서버 요청이 갑자기 중단 될 때 재고 수정만 이뤄지고, 오더는 실행 안될 수 있음
+
+  // 따라서 transaction 하기 위해 변수에 배열로 값을 넣어서 작업을 선언함
+  const queries = productIds.map((id) => {
+    return prisma.product.update({
+      where: { id },
+      data: { stock: { decrement: getQuantity(id) } },
+    });
+  });
+
+  // prisma에서 실행될 내용을 $transaction() 안에 배열로 전달, 순서 상관 없음
+  const [order] = await prisma.$transaction([
+    // 첫번째 배열 - 오더를 생성하는 작업
+    prisma.order.create({
+      data: {
+        ...orderProperties,
+        orderItems: {
+          create: orderItems,
+        },
+      },
+      include: {
+        orderItems: true,
+      },
+    }),
+    ...queries,
+  ]);
+
   res.send(order);
 });
 
