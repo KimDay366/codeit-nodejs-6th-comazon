@@ -8,7 +8,9 @@ import {
   UpdateProduct,
   CreatOrder,
   UpdateOrder,
+  SaveProduct,
 } from './structs.js';
+import { POST } from './constants.js';
 
 const app = express();
 app.use(express.json());
@@ -201,6 +203,30 @@ app.post(
     });
 
     res.status(201).send(user);
+  }),
+);
+
+app.post(
+  '/users/:id/save',
+  asyncHandler(async (req, res) => {
+    assert(req.body, SaveProduct);
+    const { id: userId } = req.params;
+    const { productId } = req.body;
+    const data = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        savedItems: {
+          // savedItems 하려고 하는 Product를 연결하기 위하여 connect :{} 사용
+          connect: {
+            id: productId,
+          },
+        },
+      },
+      include: {
+        savedItems: true,
+      },
+    });
+    res.status(201).send(data);
   }),
 );
 
@@ -550,4 +576,4 @@ app.delete(
   }),
 );
 
-app.listen(process.env.PORT || 3000, () => console.log('Server Started'));
+app.listen(POST || 3000, () => console.log('Server Started'));

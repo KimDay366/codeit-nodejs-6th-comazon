@@ -20,6 +20,10 @@ export const UpdateUser = s.partial(CreateUser);
 // s.partial(CreateUser)
 // = CreateUser 객체를 사용하되, 필요한 것 만 옵셔널하게 사용해서 데이터 검사 함
 
+export const SaveProduct = s.object({
+  productId: s.define('Uuid', (value) => isUuid.v4(value)),
+});
+
 // =============== Product Object =========================
 
 //이미 modeling 할때 선언한 enum의 상세 내역을 CATEGORIES로 다시 한번 저장
