@@ -1,5 +1,6 @@
 import * as s from 'superstruct';
 import isEmail from 'is-email'; // 특정 값이 이메일 형식인지 확인하는 라이브러리
+import isUuid from 'is-uuid'; // 특정값이 uuid인지 확인
 
 // CreateUser : 데이터 등록 = 입력할 모든 값을 검사하여 객체로 내보냄
 export const CreateUser = s.object({
@@ -18,6 +19,8 @@ export const CreateUser = s.object({
 export const UpdateUser = s.partial(CreateUser);
 // s.partial(CreateUser)
 // = CreateUser 객체를 사용하되, 필요한 것 만 옵셔널하게 사용해서 데이터 검사 함
+
+// =============== Product Object =========================
 
 //이미 modeling 할때 선언한 enum의 상세 내역을 CATEGORIES로 다시 한번 저장
 const CATEGORIES = [
@@ -44,3 +47,16 @@ export const CreatProduct = s.object({
 });
 
 export const UpdateProduct = s.partial(CreatProduct);
+
+// =============== Order Object =========================
+export const CreatOrder = s.object({
+  userId: s.define('UserUuid', (value) => isUuid.v4(value)),
+  // uuid 확인하는 라이브러리는 위와같이 어떤 타입인지 설정 해 줘야함
+  orderItems: s.array(
+    s.object({
+      productId: s.define('productUuid', (value) => isUuid.v4(value)),
+      unitPrice: s.min(s.number(), 0),
+      quantity: s.min(s.integer(), 1),
+    }),
+  ),
+});

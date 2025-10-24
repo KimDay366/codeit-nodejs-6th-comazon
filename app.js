@@ -1,7 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { assert } from 'superstruct';
-import { CreateUser, UpdateUser, CreatProduct, UpdateProduct } from './structs.js';
+import { CreateUser, UpdateUser, CreatProduct, UpdateProduct, CreatOrder } from './structs.js';
 
 const app = express();
 app.use(express.json());
@@ -43,6 +43,11 @@ app.get('/users', async (req, res) => {
     orderBy,
     skip: parseInt(offset), // 0 : 1번부터 시작, N : N번부터 시작
     take: parseInt(limit), // 가지고 올 정보 갯수
+    include: {
+      userPreference: true,
+      // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
+      // 따라서 include 해서 해당 정보를 가져옴
+    },
   });
 
   res.send(users);
@@ -54,6 +59,11 @@ app.get('/users/:id', async (req, res) => {
   // 고정되지 않은 id같은 값을 URL로 써야 할 경우 쓰는 방식
   const id = req.params.id;
   const user = await prisma.user.findUnique({
+    include: {
+      userPreference: true,
+      // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
+      // 따라서 include 해서 해당 정보를 가져옴
+    },
     where: { id },
     // shortEnd 문법 -> id:id = id 만 써도 됨
   });
@@ -140,19 +150,31 @@ app.post('/users', async (req, res) => {
 
 app.patch('/users/:id', async (req, res) => {
   const { id } = req.params;
-  const data = req.body;
 
   // 데이터 검증 심화 구문
-  try {
-    assert(data, UpdateUser);
-  } catch (e) {
-    console.log(e);
-    return res.status(400).send();
-  }
+  // try {
+  //   assert(req.body, UpdateUser);
+  // } catch (e) {
+  //   console.log(e);
+  //   return res.status(400).send();
+  // }
+
+  // 데이터 검증 간단 구문
+  assert(req.body, UpdateUser);
+
+  const { userPreference, ...userFields } = req.body;
 
   const user = await prisma.user.update({
     where: { id },
-    data,
+    data: {
+      ...userFields,
+      userPreference: {
+        update: userPreference,
+      },
+    },
+    include: {
+      userPreference: true,
+    },
   });
 
   if (user) {
@@ -284,6 +306,30 @@ app.delete('/products/:id', async (req, res) => {
   } else {
     res.status(404).send({ message: 'cannot find' });
   }
+});
+
+// ===================== Order API Zone ============================
+
+app.get('/orders', async (req, res) => {
+  const data = await prisma.order.findMany();
+  res.send(data);
+});
+
+app.post('/orders', async (req, res) => {
+  assert(req.body, CreatOrder);
+  const { orderItems, ...orderProperties } = req.body;
+  const order = await prisma.order.create({
+    data: {
+      ...orderProperties,
+      orderItems: {
+        create: orderItems,
+      },
+    },
+    include: {
+      orderItems: true,
+    },
+  });
+  res.send(order);
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('Server Started'));
