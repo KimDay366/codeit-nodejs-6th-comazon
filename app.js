@@ -11,8 +11,11 @@ import {
   SaveProduct,
 } from './structs.js';
 import { POST } from './constants.js';
+import cors from 'cors';
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
 const prisma = new PrismaClient();
