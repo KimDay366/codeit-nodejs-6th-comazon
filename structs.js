@@ -60,3 +60,9 @@ export const CreatOrder = s.object({
     }),
   ),
 });
+
+const ORDER_STATUS = ['PENDING', 'COMPLETE'];
+
+export const UpdateOrder = s.object({
+  status: s.enums(ORDER_STATUS),
+});

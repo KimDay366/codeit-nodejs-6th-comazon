@@ -35,12 +35,11 @@ Content-Type: application/json
 
 ###
 
-PATCH http://localhost:3000/products/b8de7c4b-4ac4-46a1-a25c-31d889db152a
+PATCH http://localhost:3000/products/10f12b65-20f5-43d9-860e-faf4890e2a9e
 Content-Type: application/json
 
 {
-    "name" : "다리온풍기",
-  "description" : "무릎이 시려"
+    "name" : "조던(이 신던) 남성 운동화 "
 }
 
 ###

@@ -1,7 +1,14 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { assert } from 'superstruct';
-import { CreateUser, UpdateUser, CreatProduct, UpdateProduct, CreatOrder } from './structs.js';
+import {
+  CreateUser,
+  UpdateUser,
+  CreatProduct,
+  UpdateProduct,
+  CreatOrder,
+  UpdateOrder,
+} from './structs.js';
 
 const app = express();
 app.use(express.json());
@@ -31,9 +38,20 @@ function asyncHandler(handler) {
     try {
       await handler(req, res);
     } catch (e) {
+      // 터미널에 에러 내용을 출력
+      console.error(e);
+      // console.error(`e.name : ${e.name}`);
+
+      // Prisma에서 생성한 에러인지 확인 = True
+      // console.log(e instanceof Prisma.PrismaClientKnownRequestError);
+
       // if 구문으로 에러 값을 적어서 여러 에러를 처리 가능!
-      if (e.code === 'P2025') {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
         res.sendStatus(404);
+      } else if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        res.status(400).send({ message: e.message });
+      } else if (e.name === 'StructError') {
+        res.status(400).send({ message: e.message });
       } else {
         res.status(500).send({ message: e.mossage });
       }
@@ -50,39 +68,42 @@ function asyncHandler(handler) {
 // });
 
 // user GET Filter
-app.get('/users', async (req, res) => {
-  const { offset = 0, limit = 5, order = 'newest' } = req.query;
+app.get(
+  '/users',
+  asyncHandler(async (req, res) => {
+    const { offset = 0, limit = 5, order = 'newest' } = req.query;
 
-  let orderBy;
-  // findMany 프로퍼티 명과 동일하게 변수 명을 사용함
-  switch (order) {
-    case 'oldest':
-      orderBy = { createdAt: 'asc' };
-      break;
-    case 'newest':
-      orderBy = { createdAt: 'desc' };
-      break;
-    default:
-      orderBy = { createdAt: 'desc' };
-  }
+    let orderBy;
+    // findMany 프로퍼티 명과 동일하게 변수 명을 사용함
+    switch (order) {
+      case 'oldest':
+        orderBy = { createdAt: 'asc' };
+        break;
+      case 'newest':
+        orderBy = { createdAt: 'desc' };
+        break;
+      default:
+        orderBy = { createdAt: 'desc' };
+    }
 
-  // console.log(offset);
-  // console.log(limit);
-  // console.log(order);
+    // console.log(offset);
+    // console.log(limit);
+    // console.log(order);
 
-  const users = await prisma.user.findMany({
-    orderBy,
-    skip: parseInt(offset), // 0 : 1번부터 시작, N : N번부터 시작
-    take: parseInt(limit), // 가지고 올 정보 갯수
-    include: {
-      userPreference: true,
-      // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
-      // 따라서 include 해서 해당 정보를 가져옴
-    },
-  });
+    const users = await prisma.user.findMany({
+      orderBy,
+      skip: parseInt(offset), // 0 : 1번부터 시작, N : N번부터 시작
+      take: parseInt(limit), // 가지고 올 정보 갯수
+      include: {
+        userPreference: true,
+        // user.userPreference; 하면 정의한 관계형 필드를 함께 볼 수 있음
+        // 따라서 include 해서 해당 정보를 가져옴
+      },
+    });
 
-  res.send(users);
-});
+    res.send(users);
+  }),
+);
 
 // users GET ID
 // app.get('/users/:id', async (req, res) => {
@@ -145,40 +166,43 @@ app.get(
 // });
 
 // users POST UserPreference 필드 추가
-app.post('/users', async (req, res) => {
-  assert(req.body, CreateUser); //전달받은 데이터 검증을 진행
-  const { userPreference, ...userFields } = req.body;
+app.post(
+  '/users',
+  asyncHandler(async (req, res) => {
+    assert(req.body, CreateUser); //전달받은 데이터 검증을 진행
+    const { userPreference, ...userFields } = req.body;
 
-  // console.log(userPreference);
-  // userPreference model 에 사용할 정보
-  //{"receiveEmail" : true} 출력
+    // console.log(userPreference);
+    // userPreference model 에 사용할 정보
+    //{"receiveEmail" : true} 출력
 
-  // console.log(userFields);
-  // User model 에 사용할 정보
-  // {
-  //   email: 'kimdaily11265@naver.com',
-  //   firstName: 'daily',
-  //   lastName: 'kim',
-  //   address: 'seoul in korea'
-  // }
+    // console.log(userFields);
+    // User model 에 사용할 정보
+    // {
+    //   email: 'kimdaily11265@naver.com',
+    //   firstName: 'daily',
+    //   lastName: 'kim',
+    //   address: 'seoul in korea'
+    // }
 
-  const user = await prisma.user.create({
-    data: {
-      // email. firstName, lastName.. 기존 값
-      ...userFields,
-      // 동시에 userPreference라는 데이터까지 함께 만듦
-      // 왜냐면 두 개의 모델이 서로 "관계"에 있기 때문에
-      userPreference: {
-        create: userPreference,
-      }, // 별도의 model로 되어있는 userPreference는  [create : userPreference => {"receiveEmail" : true} ] 로 값을 만들어서 사용
-    },
-    include: {
-      userPreference: true,
-    }, // 최종 return 결과를 볼 때 User만 표기하는데, 함꼐 만들어진 userPreference 까지 함께 보여달라고 하는 확인용 메세지
-  });
+    const user = await prisma.user.create({
+      data: {
+        // email. firstName, lastName.. 기존 값
+        ...userFields,
+        // 동시에 userPreference라는 데이터까지 함께 만듦
+        // 왜냐면 두 개의 모델이 서로 "관계"에 있기 때문에
+        userPreference: {
+          create: userPreference,
+        }, // 별도의 model로 되어있는 userPreference는  [create : userPreference => {"receiveEmail" : true} ] 로 값을 만들어서 사용
+      },
+      include: {
+        userPreference: true,
+      }, // 최종 return 결과를 볼 때 User만 표기하는데, 함꼐 만들어진 userPreference 까지 함께 보여달라고 하는 확인용 메세지
+    });
 
-  res.status(201).send(user);
-});
+    res.status(201).send(user);
+  }),
+);
 
 // users PATCH
 // app.patch('/users/:id', async (req, res) => {
@@ -196,107 +220,119 @@ app.post('/users', async (req, res) => {
 //   }
 // });
 
-app.patch('/users/:id', async (req, res) => {
-  const { id } = req.params;
+app.patch(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-  // 데이터 검증 심화 구문
-  // try {
-  //   assert(req.body, UpdateUser);
-  // } catch (e) {
-  //   console.log(e);
-  //   return res.status(400).send();
-  // }
+    // 데이터 검증 심화 구문
+    // try {
+    //   assert(req.body, UpdateUser);
+    // } catch (e) {
+    //   console.log(e);
+    //   return res.status(400).send();
+    // }
 
-  // 데이터 검증 간단 구문
-  assert(req.body, UpdateUser);
+    // 데이터 검증 간단 구문
+    assert(req.body, UpdateUser);
 
-  const { userPreference, ...userFields } = req.body;
+    const { userPreference, ...userFields } = req.body;
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      ...userFields,
-      userPreference: {
-        update: userPreference,
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        ...userFields,
+        userPreference: {
+          update: userPreference,
+        },
       },
-    },
-    include: {
-      userPreference: true,
-    },
-  });
+      include: {
+        userPreference: true,
+      },
+    });
 
-  if (user) {
-    res.send(user);
-  } else {
-    res.status(404).send({ message: 'Cannot find given id' });
-  }
-});
+    if (user) {
+      res.send(user);
+    } else {
+      res.status(404).send({ message: 'Cannot find given id' });
+    }
+  }),
+);
 
 // users DELETE
-app.delete('/users/:id', async (req, res) => {
-  const id = req.params.id;
-  const user = await prisma.user.delete({
-    where: { id },
-  });
+app.delete(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const user = await prisma.user.delete({
+      where: { id },
+    });
 
-  if (user) {
-    res.send(user);
-  } else {
-    res.status(404).send({ message: 'Cannot find given id' });
-  }
-});
+    if (user) {
+      res.send(user);
+    } else {
+      res.status(404).send({ message: 'Cannot find given id' });
+    }
+  }),
+);
 
 // ===================== Product API Zone ============================
 
 // product GET all
-app.get('/products', async (req, res) => {
-  const { offset = 0, limit = 10, order = 'newest', category } = req.query;
-  let orderBy;
-  switch (order) {
-    case 'priceLowest':
-      orderBy = { price: 'asc' };
-      break;
-    case 'priceHighest':
-      orderBy = { price: 'desc' };
-      break;
-    case 'oldest':
-      orderBy = { createdAt: 'asc' };
-      break;
-    case 'newest':
-      orderBy = { createdAt: 'desc' };
-      break;
-    default:
-      orderBy = { createdAt: 'desc' };
-  }
-  const where = category ? { category } : {};
-  const products = await prisma.product.findMany({
-    where,
-    orderBy,
-    skip: parseInt(offset),
-    take: parseInt(limit),
-  });
+app.get(
+  '/products',
+  asyncHandler(async (req, res) => {
+    const { offset = 0, limit = 10, order = 'newest', category } = req.query;
+    let orderBy;
+    switch (order) {
+      case 'priceLowest':
+        orderBy = { price: 'asc' };
+        break;
+      case 'priceHighest':
+        orderBy = { price: 'desc' };
+        break;
+      case 'oldest':
+        orderBy = { createdAt: 'asc' };
+        break;
+      case 'newest':
+        orderBy = { createdAt: 'desc' };
+        break;
+      default:
+        orderBy = { createdAt: 'desc' };
+    }
+    const where = category ? { category } : {};
+    const products = await prisma.product.findMany({
+      where,
+      orderBy,
+      skip: parseInt(offset),
+      take: parseInt(limit),
+    });
 
-  // 가져오는 갯수 설정이 있는 경우
-  // const count = Number(req.query.count) || 10;
+    // 가져오는 갯수 설정이 있는 경우
+    // const count = Number(req.query.count) || 10;
 
-  // 가져오는 갯수 설정이 없는 경우
-  //   const product = await prisma.product.findMany();
+    // 가져오는 갯수 설정이 없는 경우
+    //   const product = await prisma.product.findMany();
 
-  res.send(products);
-});
+    res.send(products);
+  }),
+);
 
-app.get('/products/:id', async (req, res) => {
-  const id = req.params.id;
-  const product = await prisma.product.findUnique({
-    where: { id },
-  });
+app.get(
+  '/products/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const product = await prisma.product.findUniqueOrThrow({
+      where: { id },
+    });
 
-  if (product) {
-    res.send(product);
-  } else {
-    res.status(404).send({ message: 'cannot find' });
-  }
-});
+    if (product) {
+      res.send(product);
+    } else {
+      res.status(404).send({ message: 'cannot find' });
+    }
+  }),
+);
 
 // product POST
 // app.post('/products', async (req, res) => {
@@ -312,143 +348,206 @@ app.get('/products/:id', async (req, res) => {
 //   }
 // });
 
-app.post('/products', async (req, res) => {
-  const data = req.body;
-  assert(data, CreatProduct);
-  const product = await prisma.product.create({
-    data,
-  });
+app.post(
+  '/products',
+  asyncHandler(async (req, res) => {
+    const data = req.body;
+    assert(data, CreatProduct);
+    const product = await prisma.product.create({
+      data,
+    });
 
-  if (product) {
-    res.send(product);
-  } else {
-    res.status(404).send({ message: 'Cannot find given id' });
-  }
-});
+    if (product) {
+      res.send(product);
+    } else {
+      res.status(404).send({ message: 'Cannot find given id' });
+    }
+  }),
+);
 
 // product PATCH
-app.patch('/products/:id', async (req, res) => {
-  const id = req.params.id;
-  const data = req.body;
-  const product = await prisma.product.update({
-    where: { id },
-    data,
-  });
+app.patch(
+  '/products/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const data = req.body;
+    const product = await prisma.product.update({
+      where: { id },
+      data,
+    });
 
-  if (product) {
-    res.send(product);
-  } else {
-    res.status(404).send({ message: 'cannot find' });
-  }
-});
+    if (product) {
+      res.send(product);
+    } else {
+      res.status(404).send({ message: 'cannot find' });
+    }
+  }),
+);
 
 // product DELETE
-app.delete('/products/:id', async (req, res) => {
-  const id = req.params.id;
-  const product = await prisma.product.delete({
-    where: { id },
-  });
+app.delete(
+  '/products/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const product = await prisma.product.delete({
+      where: { id },
+    });
 
-  if (product) {
-    res.send(product);
-  } else {
-    res.status(404).send({ message: 'cannot find' });
-  }
-});
+    if (product) {
+      res.send(product);
+    } else {
+      res.status(404).send({ message: 'cannot find' });
+    }
+  }),
+);
 
 // ===================== Order API Zone ============================
 
-app.get('/orders', async (req, res) => {
-  const data = await prisma.order.findMany();
-  res.send(data);
-});
+app.get(
+  '/orders',
+  asyncHandler(async (req, res) => {
+    const data = await prisma.order.findMany();
+    res.send(data);
+  }),
+);
 
-app.post('/orders', async (req, res) => {
-  assert(req.body, CreatOrder);
-  const { orderItems, ...orderProperties } = req.body;
-
-  // === 재고가 충분한가? stock(재고)와 quentity(주문물량) 비교 ===
-
-  // 1. order body에서 받아온 product Id들을 찾기
-  const productIds = orderItems.map((orderItem) => orderItem.productId);
-
-  // 2. orderItem 안에서 productId에 맞는 quentity(주문물량)를 내보냄
-  function getQuantity(productId) {
-    const orderItem = orderItems.find((orderItem) => orderItem.productId === productId);
-    return orderItem.quantity;
-  }
-
-  // 3. Prisma 데이터에서 stock을 가져오기 위한 작업
-  const products = await prisma.product.findMany({
-    // 서버에서 where로 특정 아이디를 찾은 뒤, 그 아이디 안에서 productIds를 찾아옴
-    where: { id: { in: productIds } },
-  });
-
-  // 4. stock(재고)이 quentity(주문물량)를 넘지 않는지 비교
-  const isSufficientStock = products.every((product) => {
-    const { id, stock } = product;
-    return stock >= getQuantity(id);
-  });
-
-  // 5-1. 재고가 부족 한 경우, 조기종료
-  if (!isSufficientStock) {
-    return res.send(500).send({ message: 'Insufficient Stock' });
-  }
-
-  // 5-2. 재고가 있는 경우 해당 아이템을 찾아서, 데이터베이스에 있는 재고를 수정함
-  // Promise.all을 사용해서, 각 Product가 여러개 일때 순차적 실행이 아니라 한번에 병렬로 실행되게 선언
-  // await Promise.all(
-  //   productIds.map((id) => {
-  //     prisma.product.update({
-  //       where: { id },
-  //       data: { stock: { decrement: getQuantity(id) } },
-  //       // stock: { decrement: getQuantity(id) }
-  //       // stock = stock - getQuantity(id)
-  //       // 즉, 기존 재고에서 주문 물량을 빼버림
-  //     });
-  //   }),
-  // );
-
-  // const order = await prisma.order.create({
-  //   data: {
-  //     ...orderProperties,
-  //     orderItems: {
-  //       create: orderItems,
-  //     },
-  //   },
-  //   include: {
-  //     orderItems: true,
-  //   },
-  // });
-
-  // 위와 같이 요청 작업을 개별로 하면 서버 요청이 갑자기 중단 될 때 재고 수정만 이뤄지고, 오더는 실행 안될 수 있음
-
-  // 따라서 transaction 하기 위해 변수에 배열로 값을 넣어서 작업을 선언함
-  const queries = productIds.map((id) => {
-    return prisma.product.update({
+app.get(
+  '/orders/:id',
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const order = await prisma.order.findUniqueOrThrow({
       where: { id },
-      data: { stock: { decrement: getQuantity(id) } },
-    });
-  });
-
-  // prisma에서 실행될 내용을 $transaction() 안에 배열로 전달, 순서 상관 없음
-  const [order] = await prisma.$transaction([
-    // 첫번째 배열 - 오더를 생성하는 작업
-    prisma.order.create({
-      data: {
-        ...orderProperties,
+      include: {
         orderItems: {
-          create: orderItems,
+          include: {
+            product: true,
+          },
         },
       },
-      include: {
-        orderItems: true,
-      },
-    }),
-    ...queries,
-  ]);
+    });
+    let total = 0;
+    order.orderItems.forEach((orderItem) => {
+      total += orderItem.unitPrice * orderItem.quantity;
+    });
+    order.total = total;
+    res.send(order);
+  }),
+);
 
-  res.send(order);
-});
+app.post(
+  '/orders',
+  asyncHandler(async (req, res) => {
+    assert(req.body, CreatOrder);
+    const { orderItems, ...orderProperties } = req.body;
+
+    // === 재고가 충분한가? stock(재고)와 quentity(주문물량) 비교 ===
+
+    // 1. order body에서 받아온 product Id들을 찾기
+    const productIds = orderItems.map((orderItem) => orderItem.productId);
+
+    // 2. orderItem 안에서 productId에 맞는 quentity(주문물량)를 내보냄
+    function getQuantity(productId) {
+      const orderItem = orderItems.find((orderItem) => orderItem.productId === productId);
+      return orderItem.quantity;
+    }
+
+    // 3. Prisma 데이터에서 stock을 가져오기 위한 작업
+    const products = await prisma.product.findMany({
+      // 서버에서 where로 특정 아이디를 찾은 뒤, 그 아이디 안에서 productIds를 찾아옴
+      where: { id: { in: productIds } },
+    });
+
+    // 4. stock(재고)이 quentity(주문물량)를 넘지 않는지 비교
+    const isSufficientStock = products.every((product) => {
+      const { id, stock } = product;
+      return stock >= getQuantity(id);
+    });
+
+    // 5-1. 재고가 부족 한 경우, 조기종료
+    if (!isSufficientStock) {
+      return res.send(500).send({ message: 'Insufficient Stock' });
+    }
+
+    // 5-2. 재고가 있는 경우 해당 아이템을 찾아서, 데이터베이스에 있는 재고를 수정함
+    // Promise.all을 사용해서, 각 Product가 여러개 일때 순차적 실행이 아니라 한번에 병렬로 실행되게 선언
+    // await Promise.all(
+    //   productIds.map((id) => {
+    //     prisma.product.update({
+    //       where: { id },
+    //       data: { stock: { decrement: getQuantity(id) } },
+    //       // stock: { decrement: getQuantity(id) }
+    //       // stock = stock - getQuantity(id)
+    //       // 즉, 기존 재고에서 주문 물량을 빼버림
+    //     });
+    //   }),
+    // );
+
+    // const order = await prisma.order.create({
+    //   data: {
+    //     ...orderProperties,
+    //     orderItems: {
+    //       create: orderItems,
+    //     },
+    //   },
+    //   include: {
+    //     orderItems: true,
+    //   },
+    // });
+
+    // 위와 같이 요청 작업을 개별로 하면 서버 요청이 갑자기 중단 될 때 재고 수정만 이뤄지고, 오더는 실행 안될 수 있음
+
+    // 따라서 transaction 하기 위해 변수에 배열로 값을 넣어서 작업을 선언함
+    const queries = productIds.map((id) => {
+      return prisma.product.update({
+        where: { id },
+        data: { stock: { decrement: getQuantity(id) } },
+      });
+    });
+
+    // prisma에서 실행될 내용을 $transaction() 안에 배열로 전달, 순서 상관 없음
+    const [order] = await prisma.$transaction([
+      // 첫번째 배열 - 오더를 생성하는 작업
+      prisma.order.create({
+        data: {
+          ...orderProperties,
+          orderItems: {
+            create: orderItems,
+          },
+        },
+        include: {
+          orderItems: true,
+        },
+      }),
+      ...queries,
+    ]);
+
+    res.send(order);
+  }),
+);
+
+app.patch(
+  '/orders/:id',
+  asyncHandler(async (req, res) => {
+    assert(req.body, UpdateOrder);
+    const { id } = req.params;
+    const { status } = req.body;
+    const order = await prisma.order.update({
+      where: { id },
+      data: { status },
+    });
+    res.send(order);
+  }),
+);
+
+app.delete(
+  '/orders/:id',
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const order = await prisma.order.delete({
+      where: { id },
+    });
+    res.send(204);
+  }),
+);
 
 app.listen(process.env.PORT || 3000, () => console.log('Server Started'));
